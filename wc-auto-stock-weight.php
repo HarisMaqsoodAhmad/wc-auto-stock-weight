@@ -24,12 +24,22 @@ function wc_add_main_stock_field()
 }
 
 // Save custom field and distribute stock
-add_action('woocommerce_process_product_meta_variable', 'wc_save_and_distribute_stock');
-function wc_save_and_distribute_stock($product_id)
+add_action('save_post', 'wc_distribute_stock_on_save_wp', 20, 3);
+function wc_distribute_stock_on_save_wp($product_id, $post, $update)
 {
 
-    // Verify nonce
-    if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'woocommerce-save-data')) {
+    // Only run in admin screen and on update (not quick edit, revisions, autosave, etc.)
+    if (wp_is_post_revision($product_id) || defined('DOING_AUTOSAVE') || !current_user_can('edit_product', $product_id)) {
+        return;
+    }
+
+    // Verify the WooCommerce product-data nonce
+    if (!isset($_POST['woocommerce_meta_nonce']) || !wp_verify_nonce(wp_unslash($_POST['woocommerce_meta_nonce']), 'woocommerce_save_data')) {
+        return;
+    }
+
+    $product = wc_get_product($product_id);
+    if (!$product || 'variable' !== $product->get_type()) {
         return;
     }
 
